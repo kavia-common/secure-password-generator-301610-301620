@@ -81,16 +81,91 @@ function PasswordGenerator() {
 
   // PUBLIC_INTERFACE
   /**
-   * Copy the generated password to clipboard
+   * Fallback method to copy text using the legacy execCommand API
+   * @param {string} text - The text to copy to clipboard
+   * @returns {boolean} - True if successful, false otherwise
+   */
+  const fallbackCopyToClipboard = (text) => {
+    // Create a temporary textarea element
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    
+    // Make it invisible and prevent scrolling
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-9999px';
+    textArea.style.left = '-9999px';
+    textArea.style.opacity = '0';
+    textArea.setAttribute('readonly', '');
+    
+    document.body.appendChild(textArea);
+    
+    try {
+      // Select the text
+      textArea.focus();
+      textArea.select();
+      textArea.setSelectionRange(0, text.length);
+      
+      // Execute copy command
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      return successful;
+    } catch (err) {
+      document.body.removeChild(textArea);
+      return false;
+    }
+  };
+
+  // PUBLIC_INTERFACE
+  /**
+   * Copy the generated password to clipboard with modern API and fallback support
    */
   const handleCopyToClipboard = async () => {
-    if (!generatedPassword) return;
+    // Validate that there's a password to copy
+    if (!generatedPassword || generatedPassword.trim() === '') {
+      showToast('No password to copy', 'error');
+      return;
+    }
 
     try {
-      await navigator.clipboard.writeText(generatedPassword);
-      showToast('Password copied to clipboard!', 'success');
+      // First, try the modern Clipboard API if available
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(generatedPassword);
+        showToast('Password copied to clipboard!', 'success');
+        return;
+      }
+      
+      // If Clipboard API is not available, use fallback
+      const success = fallbackCopyToClipboard(generatedPassword);
+      
+      if (success) {
+        showToast('Password copied to clipboard!', 'success');
+      } else {
+        showToast('Failed to copy password. Please copy manually.', 'error');
+      }
     } catch (err) {
-      showToast('Failed to copy password', 'error');
+      // If modern API fails (e.g., permissions denied), try fallback
+      console.error('Clipboard API failed:', err);
+      
+      const success = fallbackCopyToClipboard(generatedPassword);
+      
+      if (success) {
+        showToast('Password copied to clipboard!', 'success');
+      } else {
+        // If both methods fail, provide helpful error message
+        let errorMessage = 'Failed to copy password.';
+        
+        // Check if it's a permission issue
+        if (err.name === 'NotAllowedError') {
+          errorMessage = 'Clipboard access denied. Please allow clipboard permissions or copy manually.';
+        } else if (!window.isSecureContext) {
+          errorMessage = 'Clipboard access requires HTTPS. Please copy manually.';
+        } else {
+          errorMessage = 'Failed to copy password. Please copy manually.';
+        }
+        
+        showToast(errorMessage, 'error');
+      }
     }
   };
 

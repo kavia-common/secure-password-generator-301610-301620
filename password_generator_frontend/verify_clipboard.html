@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipboard Verification Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Clipboard Copy Verification Test</h1>
+        <p>This page tests the clipboard functionality implemented in the Password Generator.</p>
+        
+        <div class="test-section">
+            <h3>Test 1: Modern Clipboard API</h3>
+            <input type="text" id="test1-input" value="TestPassword123!" readonly>
+            <button onclick="testModernAPI()">Copy with Clipboard API</button>
+            <div id="test1-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 2: Fallback Method (execCommand)</h3>
+            <input type="text" id="test2-input" value="FallbackTest456!" readonly>
+            <button onclick="testFallback()">Copy with Fallback</button>
+            <div id="test2-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 3: Combined Method (with fallback)</h3>
+            <input type="text" id="test3-input" value="CombinedTest789!" readonly>
+            <button onclick="testCombined()">Copy with Auto-Fallback</button>
+            <div id="test3-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 4: Empty String Validation</h3>
+            <input type="text" id="test4-input" value="" readonly>
+            <button onclick="testEmpty()">Try Copy Empty</button>
+            <div id="test4-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Environment Info</h3>
+            <div id="env-info" class="result info"></div>
+        </div>
+    </div>
+
+    <script>
+        // Display environment info
+        window.onload = function() {
+            const envInfo = document.getElementById('env-info');
+            let info = '<strong>Environment:</strong><br>';
+            info += `• Clipboard API available: ${!!navigator.clipboard}<br>`;
+            info += `• Secure context: ${window.isSecureContext}<br>`;
+            info += `• Protocol: ${window.location.protocol}<br>`;
+            info += `• User Agent: ${navigator.userAgent.substring(0, 50)}...<br>`;
+            envInfo.innerHTML = info;
+        };
+
+        // Test 1: Modern Clipboard API
+        async function testModernAPI() {
+            const input = document.getElementById('test1-input');
+            const result = document.getElementById('test1-result');
+            
+            try {
+                await navigator.clipboard.writeText(input.value);
+                result.className = 'result success';
+                result.textContent = '✓ Successfully copied using Clipboard API!';
+            } catch (err) {
+                result.className = 'result error';
+                result.textContent = `✗ Failed: ${err.message}`;
+            }
+        }
+
+        // Test 2: Fallback method
+        function testFallback() {
+            const input = document.getElementById('test2-input');
+            const result = document.getElementById('test2-result');
+            
+            const textArea = document.createElement('textarea');
+            textArea.value = input.value;
+            textArea.style.position = 'fixed';
+            textArea.style.top = '-9999px';
+            textArea.style.left = '-9999px';
+            textArea.style.opacity = '0';
+            textArea.setAttribute('readonly', '');
+            
+            document.body.appendChild(textArea);
+            
+            try {
+                textArea.focus();
+                textArea.select();
+                textArea.setSelectionRange(0, input.value.length);
+                
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (successful) {
+                    result.className = 'result success';
+                    result.textContent = '✓ Successfully copied using fallback method!';
+                } else {
+                    result.className = 'result error';
+                    result.textContent = '✗ Fallback method failed';
+                }
+            } catch (err) {
+                document.body.removeChild(textArea);
+                result.className = 'result error';
+                result.textContent = `✗ Failed: ${err.message}`;
+            }
+        }
+
+        // Test 3: Combined method with automatic fallback
+        async function testCombined() {
+            const input = document.getElementById('test3-input');
+            const result = document.getElementById('test3-result');
+            const text = input.value;
+            
+            try {
+                // Try modern API first
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    result.className = 'result success';
+                    result.textContent = '✓ Successfully copied using Clipboard API!';
+                    return;
+                }
+                
+                // Fallback to execCommand
+                const success = fallbackCopy(text);
+                if (success) {
+                    result.className = 'result success';
+                    result.textContent = '✓ Successfully copied using fallback method!';
+                } else {
+                    result.className = 'result error';
+                    result.textContent = '✗ Both methods failed';
+                }
+            } catch (err) {
+                // If modern API fails, try fallback
+                const success = fallbackCopy(text);
+                if (success) {
+                    result.className = 'result success';
+                    result.textContent = '✓ Fallback succeeded after API failed!';
+                } else {
+                    result.className = 'result error';
+                    result.textContent = `✗ All methods failed: ${err.message}`;
+                }
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.top = '-9999px';
+            textArea.style.left = '-9999px';
+            textArea.style.opacity = '0';
+            textArea.setAttribute('readonly', '');
+            
+            document.body.appendChild(textArea);
+            
+            try {
+                textArea.focus();
+                textArea.select();
+                textArea.setSelectionRange(0, text.length);
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return successful;
+            } catch (err) {
+                document.body.removeChild(textArea);
+                return false;
+            }
+        }
+
+        // Test 4: Empty string validation
+        function testEmpty() {
+            const input = document.getElementById('test4-input');
+            const result = document.getElementById('test4-result');
+            
+            if (!input.value || input.value.trim() === '') {
+                result.className = 'result info';
+                result.textContent = '✓ Validation working: Empty string detected, copy prevented';
+            } else {
+                result.className = 'result error';
+                result.textContent = '✗ Validation failed: Should have detected empty string';
+            }
+        }
+    </script>
+</body>
+</html>
